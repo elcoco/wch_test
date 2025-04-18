@@ -10,6 +10,22 @@
     SUBSYSTEM=="usb", ATTR{idVendor}="1a86", ATTR{idProduct}=="8012", GROUP="uucp"
     EOF
 
+# Neovim
+
+Neovim can not find anything in the platformio framework by default.
+This is fixed by telling clang where stuff is.  
+
+source: https://gist.github.com/ironlungx/a2b620de74f875c49c1d06999a8c41f8  
+The important parts are:  
+- .clangd
+- .clang-tidy
+- scripts/gen_compile_commands.py
+
+    # run
+    pio run -t compiledb
+
+
+
 # Documentation
 
 Example projects: https://github.com/openwch/ch32_training_documentation/tree/main  
