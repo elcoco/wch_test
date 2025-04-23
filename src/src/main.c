@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ch32v20x_gpio.h>
-#include "ssd1306.h"
+#include "oled.h"
+#include "i2c.h"
 
 
 
@@ -16,6 +17,8 @@
 
 #define ROT_SW_PORT GPIOB
 #define ROT_SW_PIN  GPIO_Pin_5
+
+#define OLED_ADDR 0x3C
 
 
 struct RotEnc {
@@ -92,24 +95,22 @@ int main()
 
     rotenc_init();
 
-    i2c_init();
-    Delay_Ms(1000);
-    i2c_scan(I2C1);
+    i2c_init(I2C1, GPIO_Pin_6, GPIO_Pin_7); // SCL, SDA
+    //i2c_scan(I2C1);
 
-    if (ssd1306_init(I2C1, 0x3C) < I2C_SUCCESS)
+    struct Oled oled;
+    if (oled_init(&oled, I2C1, OLED_ADDR) < OLED_STATUS_SUCCESS)
         printf("Failed to init display\n");
 
-    printf("Init display\n");
+    printf("Start\n");
 
+    Delay_Ms(1000);
+    oled_set_contrast(&oled, 50);
+    oled_clear(&oled);
 
-
-    
-
-    //if ((res = i2c_recv_byte(I2C1, 0x3B, &buf)) < I2C_SUCCESS)
-    //    printf("Failed to receive byte\n");
-    //else
-    //    printf("Received: 0x%X\n", buf);
-
+    u8 num = 66;
+    oled_printf(&oled, 0, 7, "Disko!!! %d 123456789", num);
+    oled_flush(&oled);
 
     while(1) {
         if (enc0.is_triggered) {
