@@ -65,7 +65,7 @@ void setup_menu(struct Menu *root)
     menu_add_item(root, &item9);
 
     sub0 = menu_init();
-    //menu_item_add_submenu(&item2, &sub0);
+    menu_item_add_submenu(&item2, &sub0);
 
     sub0_item0 = menu_item_init("sub0_Item 0", '0');
     sub0_item1 = menu_item_init("sub0_Item 1", '1');
@@ -88,6 +88,15 @@ void oled_print_menu(struct Oled *oled, struct ViewPort *vp, struct Menu *menu)
                 oled_printf(oled, 0, i, "  %s", item->title);
         }
     }
+}
+
+struct Menu* on_menu_item_clicked(struct ViewPort *vp, struct Menu *menu)
+{
+    struct MenuItem *selected = vp_get_selected(vp, menu);
+    if (menu_item_is_submenu(selected)) {
+        return selected->sub_menu;
+    }
+    return NULL;
 }
 
 int main()
@@ -129,21 +138,23 @@ int main()
     oled_print_menu(&oled, &vp, &root);
     oled_flush(&oled);
 
+    struct Menu *menu = &root;
+
     while(1) {
         if (enc0.is_triggered) {
             enc0.is_triggered = 0;
             switch (enc0.dir) {
                 case R_DIR_CW:
-                    vp_down(&vp, &root);
-                    vp_print(&vp, &root);
+                    vp_down(&vp, menu);
+                    vp_print(&vp, menu);
                     break;
                 case R_DIR_CCW:
-                    vp_up(&vp, &root);
-                    vp_print(&vp, &root);
+                    vp_up(&vp, menu);
+                    vp_print(&vp, menu);
                     break;
             }
             printf("enc0: %d\n", enc0.n_clicks);
-            oled_print_menu(&oled, &vp, &root);
+            oled_print_menu(&oled, &vp, menu);
             oled_flush(&oled);
             //oled_clear_line(&oled, 3);
             //oled_printf(&oled, 0, 3, "rot: %d", enc0.n_clicks);
@@ -152,6 +163,10 @@ int main()
         if (enc0.is_pressed) {
             enc0.is_pressed = 0;
             printf("clicked\n");
+
+            struct Menu *sel;
+            if ((sel = on_menu_item_clicked(&vp, menu)) != NULL)
+                menu = sel;
         }
 
         Delay_Ms(100);
