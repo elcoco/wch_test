@@ -1,6 +1,6 @@
 #include "i2c.h"
 
-void i2c_init(I2C_TypeDef *I2Cx, u16 pin_scl, u16 pin_sda)
+void i2c_init(I2C_TypeDef *I2Cx, u16 pin_scl, u16 pin_sda, GPIO_TypeDef *port)
 {
     GPIO_InitTypeDef GPIO_InitStructure = {0};
     I2C_InitTypeDef I2C_InitStructure = {0};
@@ -12,13 +12,13 @@ void i2c_init(I2C_TypeDef *I2Cx, u16 pin_scl, u16 pin_sda)
     GPIO_InitStructure.GPIO_Pin = pin_scl;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_OD;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(I2C_GPIO_PORT, &GPIO_InitStructure);
+    GPIO_Init(port, &GPIO_InitStructure);
 
     GPIO_StructInit(&GPIO_InitStructure);
     GPIO_InitStructure.GPIO_Pin = pin_sda;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_OD;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(I2C_GPIO_PORT, &GPIO_InitStructure);
+    GPIO_Init(port, &GPIO_InitStructure);
 
     I2C_StructInit(&I2C_InitStructure);
     I2C_InitStructure.I2C_ClockSpeed = 400000;
@@ -33,7 +33,7 @@ void i2c_init(I2C_TypeDef *I2Cx, u16 pin_scl, u16 pin_sda)
     I2C_Cmd(I2Cx, ENABLE);
 }
 
-enum I2CRes i2c_recv_byte(I2C_TypeDef *I2Cx, u8 addr, u8 *buf)
+enum I2CStatus i2c_recv_byte(I2C_TypeDef *I2Cx, u8 addr, u8 *buf)
 {
     u32 timeout = 0;
 
@@ -51,7 +51,7 @@ enum I2CRes i2c_recv_byte(I2C_TypeDef *I2Cx, u8 addr, u8 *buf)
 
     // Check if ACK is received
     if (!(I2Cx->STAR1 & I2C_STAR1_TXE))
-        return I2C_ERR_NO_ACK;
+        return I2C_STATUS_ERR_NO_ACK;
 
     // I2C1->STAR1->RXNE == 1 when data is received
     timeout = 0;
@@ -61,7 +61,7 @@ enum I2CRes i2c_recv_byte(I2C_TypeDef *I2Cx, u8 addr, u8 *buf)
     *buf = I2C_ReceiveData(I2Cx);
     I2C_GenerateSTOP(I2Cx, ENABLE);
 
-    return I2C_SUCCESS;
+    return I2C_STATUS_SUCCESS;
 }
 
 void i2c_scan(I2C_TypeDef *I2Cx)
@@ -70,9 +70,9 @@ void i2c_scan(I2C_TypeDef *I2Cx)
     u8 hit_cnt = 0;
     for (u8 addr=1 ; addr<128 ; addr++) {
 
-        enum I2CRes res;
+        enum I2CStatus res;
 
-        if ((res = i2c_start_tx(I2Cx, addr)) == I2C_SUCCESS)
+        if ((res = i2c_start_tx(I2Cx, addr)) == I2C_STATUS_SUCCESS)
             printf("  %d: 0x%0X\n", hit_cnt++, addr);
 
         i2c_stop(I2Cx, addr);
@@ -80,7 +80,7 @@ void i2c_scan(I2C_TypeDef *I2Cx)
     printf("Found %d device(s)\n", hit_cnt);
 }
 
-enum I2CRes i2c_start_tx(I2C_TypeDef *I2Cx, u8 addr)
+enum I2CStatus i2c_start_tx(I2C_TypeDef *I2Cx, u8 addr)
 {
     while (I2C_GetFlagStatus(I2Cx, I2C_FLAG_BUSY) != RESET);
 
@@ -97,22 +97,22 @@ enum I2CRes i2c_start_tx(I2C_TypeDef *I2Cx, u8 addr)
 
     // Check if ACK is received
     if (!(I2Cx->STAR1 & I2C_STAR1_TXE))
-        return I2C_ERR_NO_ACK;
+        return I2C_STATUS_ERR_NO_ACK;
 
-    return I2C_SUCCESS;
+    return I2C_STATUS_SUCCESS;
 }
 
-enum I2CRes i2c_stop(I2C_TypeDef *I2Cx, u8 addr)
+enum I2CStatus i2c_stop(I2C_TypeDef *I2Cx, u8 addr)
 {
     I2C_GenerateSTART(I2Cx, DISABLE);
     I2C_GenerateSTOP(I2Cx, ENABLE);
-    return I2C_SUCCESS;
+    return I2C_STATUS_SUCCESS;
 }
 
-enum I2CRes i2c_write_byte(I2C_TypeDef *I2Cx, u8 addr, u8 payload)
+enum I2CStatus i2c_write_byte(I2C_TypeDef *I2Cx, u8 addr, u8 payload)
 {
     /* Send byte and wait until register is empty */
     I2C_SendData(I2Cx, payload);
     while (!I2C_CheckEvent(I2Cx, I2C_EVENT_MASTER_BYTE_TRANSMITTED));
-    return I2C_SUCCESS;
+    return I2C_STATUS_SUCCESS;
 }

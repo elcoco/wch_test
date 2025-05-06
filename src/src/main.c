@@ -4,85 +4,90 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ch32v20x_gpio.h>
+#include "ch32v20x_exti.h"
+
 #include "oled.h"
 #include "i2c.h"
+#include "rotenc.h"
+#include "menu.h"
+
+struct RotEnc enc0;
+
+struct MenuItem item0;
+struct MenuItem item1;
+struct MenuItem item2;
+struct MenuItem item3;
+struct MenuItem item4;
+struct MenuItem item5;
+struct MenuItem item6;
+struct MenuItem item7;
+struct MenuItem item8;
+struct MenuItem item9;
+
+struct Menu sub0;
+
+struct MenuItem sub0_item0;
+struct MenuItem sub0_item1;
+struct MenuItem sub0_item2;
+
+// WCH-Interrupt-fast enables saving/restoring hardware registers when entering/leaving
+// interrupt (Hardware Preamble/Epilogue HPE)
+void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void HardFault_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void EXTI3_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void EXTI4_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void EXTI9_5_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 
 
-
-#define ROT_A_PORT GPIOB
-#define ROT_A_PIN  GPIO_Pin_3
-
-#define ROT_B_PORT GPIOB
-#define ROT_B_PIN  GPIO_Pin_4
-
-#define ROT_SW_PORT GPIOB
-#define ROT_SW_PIN  GPIO_Pin_5
-
-#define OLED_ADDR 0x3C
-
-
-struct RotEnc {
-    u8 n_clicks;
-    u8 is_triggered;
-    u8 is_pressed;
-} enc0;
-
-
-
-void rotenc_init()
+void setup_menu(struct Menu *root)
 {
-    memset(&enc0, 0, sizeof(struct RotEnc));
+    printf("Init menu\n");
+    item0 = menu_item_init("Item 0", '0');
+    item1 = menu_item_init("Item 1", '1');
+    item2 = menu_item_init("Item 2", '2');
+    item3 = menu_item_init("Item 3", '3');
+    item4 = menu_item_init("Item 4", '4');
+    item5 = menu_item_init("Item 5", '5');
+    item6 = menu_item_init("Item 6", '6');
+    item7 = menu_item_init("Item 7", '7');
+    item8 = menu_item_init("Item 8", '8');
+    item9 = menu_item_init("Item 9", '9');
 
-    GPIO_InitTypeDef ROT_A_InitStructure = {0};
-    GPIO_InitTypeDef ROT_B_InitStructure = {0};
-    GPIO_InitTypeDef ROT_SW_InitStructure = {0};
-    EXTI_InitTypeDef EXTI_InitStructure = {0};
-    NVIC_InitTypeDef NVIC_InitStructure = {0};
+    menu_add_item(root, &item0);
+    menu_add_item(root, &item1);
+    menu_add_item(root, &item2);
+    menu_add_item(root, &item3);
+    menu_add_item(root, &item4);
+    menu_add_item(root, &item5);
+    menu_add_item(root, &item6);
+    menu_add_item(root, &item7);
+    menu_add_item(root, &item8);
+    menu_add_item(root, &item9);
 
-    // RCC->APB2PCENR - set Alternative Functions IO Clock, GPIO port clock
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOB, ENABLE);
+    sub0 = menu_init();
+    //menu_item_add_submenu(&item2, &sub0);
 
-    GPIO_StructInit(&ROT_SW_InitStructure);
-    ROT_SW_InitStructure.GPIO_Pin = ROT_SW_PIN;
-    ROT_SW_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-    GPIO_Init(ROT_SW_PORT, &ROT_SW_InitStructure);
+    sub0_item0 = menu_item_init("sub0_Item 0", '0');
+    sub0_item1 = menu_item_init("sub0_Item 1", '1');
+    sub0_item2 = menu_item_init("sub0_Item 2", '2');
 
-    GPIO_StructInit(&ROT_A_InitStructure);
-    ROT_A_InitStructure.GPIO_Pin = ROT_A_PIN;
-    ROT_A_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-    GPIO_Init(ROT_A_PORT, &ROT_A_InitStructure);
+    menu_add_item(&sub0, &sub0_item0);
+    menu_add_item(&sub0, &sub0_item1);
+    menu_add_item(&sub0, &sub0_item2);
+}
 
-    GPIO_StructInit(&ROT_B_InitStructure);
-    ROT_B_InitStructure.GPIO_Pin = ROT_B_PIN;
-    ROT_B_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
-    GPIO_Init(ROT_B_PORT, &ROT_B_InitStructure);
-
-
-    /* GPIOB ----> EXTI_Line3 */
-    GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource3);
-
-    /* GPIOB ----> EXTI_Line5 */
-    GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource5);
-
-    // Should set bit 0 of EXTI->EXTI_INTFR when externally triggered
-    EXTI_InitStructure.EXTI_Line = EXTI_Line3 | EXTI_Line5;
-    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
-    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-    EXTI_Init(&EXTI_InitStructure);
-
-    NVIC_InitStructure.NVIC_IRQChannel = EXTI3_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-
-    NVIC_InitStructure.NVIC_IRQChannel = EXTI9_5_IRQn;
-    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
-    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);
-
+void oled_print_menu(struct Oled *oled, struct ViewPort *vp, struct Menu *menu)
+{
+    for (int i=0 ; i<vp->max_lines ; i++) {
+        struct MenuItem *item = vp_get_line(vp, menu, i);
+        if (item) {
+            oled_clear_line(oled, i);
+            if (vp_get_selected(vp, menu) == item)
+                oled_printf(oled, 0, i, "> %s", item->title);
+            else
+                oled_printf(oled, 0, i, "  %s", item->title);
+        }
+    }
 }
 
 int main()
@@ -92,11 +97,14 @@ int main()
     Delay_Init();
     USART_Printf_Init(115200);
 
+    re_init(&enc0);
 
-    rotenc_init();
+    struct Menu root = menu_init();
+    struct ViewPort vp = vp_init(10, 8);
+    setup_menu(&root);
+    menu_debug(&root);
 
-    i2c_init(I2C1, GPIO_Pin_6, GPIO_Pin_7); // SCL, SDA
-    //i2c_scan(I2C1);
+    i2c_init(I2C1, GPIO_Pin_6, GPIO_Pin_7, I2C_GPIO_PORT); // SCL, SDA
 
     struct Oled oled;
     if (oled_init(&oled, I2C1, OLED_ADDR) < OLED_STATUS_SUCCESS)
@@ -108,14 +116,38 @@ int main()
     oled_set_contrast(&oled, 50);
     oled_clear(&oled);
 
-    u8 num = 66;
-    oled_printf(&oled, 0, 7, "Disko!!! %d 123456789", num);
+    //oled_set_px(&oled, 60, 50);
+
+
+    //u8 num = 66;
+    //oled_printf(&oled, 0, 0, "Disko!!! %d 123456789", num);
+    //oled_flush(&oled);
+
+    //oled_printf(&oled, 0, 0, "bever!", num);
+    //oled_printf(&oled, 0, 3, "rot: %d", enc0.n_clicks);
+    //oled_flush(&oled);
+    oled_print_menu(&oled, &vp, &root);
     oled_flush(&oled);
 
     while(1) {
         if (enc0.is_triggered) {
             enc0.is_triggered = 0;
-            printf("enc0: %lu\n", enc0.n_clicks);
+            switch (enc0.dir) {
+                case R_DIR_CW:
+                    vp_down(&vp, &root);
+                    vp_print(&vp, &root);
+                    break;
+                case R_DIR_CCW:
+                    vp_up(&vp, &root);
+                    vp_print(&vp, &root);
+                    break;
+            }
+            printf("enc0: %d\n", enc0.n_clicks);
+            oled_print_menu(&oled, &vp, &root);
+            oled_flush(&oled);
+            //oled_clear_line(&oled, 3);
+            //oled_printf(&oled, 0, 3, "rot: %d", enc0.n_clicks);
+            //oled_flush(&oled);
         }
         if (enc0.is_pressed) {
             enc0.is_pressed = 0;
@@ -126,12 +158,6 @@ int main()
     }
 }
 
-// WCH-Interrupt-fast enables saving/restoring hardware registers when entering/leaving
-// interrupt (Hardware Preamble/Epilogue HPE)
-void NMI_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
-void HardFault_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
-void EXTI3_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
-void EXTI9_5_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 
 void NMI_Handler(void)
 {
@@ -152,17 +178,56 @@ void EXTI9_5_IRQHandler(void)
     }
 }
 
+volatile u8 a_prev = -1;
+
+
 void EXTI3_IRQHandler(void)
 {
+
     if (EXTI_GetITStatus(EXTI_Line3) != RESET) {
-        enc0.is_triggered = 1;
+        //printf("A\n");
+        re_check(&enc0);
 
-        //printf("Run at EXTI\n");
-        if (GPIO_ReadInputDataBit(ROT_B_PORT, ROT_B_PIN))
-            enc0.n_clicks = (enc0.n_clicks > 0) ? enc0.n_clicks - 1 : 0;
-        else
-            enc0.n_clicks = (enc0.n_clicks < 255) ? enc0.n_clicks + 1 : 255;
+        //static int oldClock = -1; // Initialize to an impossible value.
+        //u8 a = GPIO_ReadInputDataBit(ROT_A_PORT, ROT_A_PIN);
+        //u8 b = GPIO_ReadInputDataBit(ROT_B_PORT, ROT_B_PIN);
+        //if(a == a_prev)
+        //    return; // was a bounce. Don't count this.
+        //            //
+        //enc0.is_triggered = 1;
 
-        EXTI_ClearITPendingBit(EXTI_Line3);     /* Clear Flag */
+        //if(a ^ b) {
+        //      // clockwise move
+        //    enc0.n_clicks = (enc0.n_clicks > 0) ? enc0.n_clicks - 1 : 0;
+        //} else {
+        //   // counterclockwise move
+        //    enc0.n_clicks = (enc0.n_clicks < 255) ? enc0.n_clicks + 1 : 255;
+        //}
+        //a_prev = a; // store clock state for debounce check.
+
+
+
+
+
+        //u8 a = GPIO_ReadInputDataBit(ROT_A_PORT, ROT_A_PIN);
+        //u8 b = GPIO_ReadInputDataBit(ROT_B_PORT, ROT_B_PIN);
+        //if (!a) {
+        //    enc0.is_triggered = 1;
+        //    if (b)
+        //        enc0.n_clicks = (enc0.n_clicks > 0) ? enc0.n_clicks - 1 : 0;
+        //    else
+        //        enc0.n_clicks = (enc0.n_clicks < 255) ? enc0.n_clicks + 1 : 255;
+        //}
+
+    }
+    EXTI_ClearITPendingBit(EXTI_Line3);     /* Clear Flag */
+}
+
+void EXTI4_IRQHandler(void)
+{
+    if (EXTI_GetITStatus(EXTI_Line4) != RESET) {
+        //printf("B\n");
+        re_check(&enc0);
+        EXTI_ClearITPendingBit(EXTI_Line4);     /* Clear Flag */
     }
 }
