@@ -10,7 +10,7 @@
 
 // Create a pool of items that is used to allocate space for menu items.
 // This way we don't have to reserve a lot of memory for every menu.
-#define MENU_ITEM_POOL_MAX 16 
+#define MENU_ITEM_POOL_MAX 20 
 #define MENU_POOL_MAX 5 
 
 /* A viewport gives a view on the menu data. It handles navigating the menu
@@ -40,31 +40,23 @@ struct MenuItem {
 struct MenuPool {
     struct MenuItem item_pool[MENU_ITEM_POOL_MAX];
     struct Menu menu_pool[MENU_POOL_MAX];
-    size_t menus_alloc;
-    size_t items_alloc;
+    size_t menus_alloc;         // Amount of allocated menu structs
+    size_t items_alloc;         // Amount of allocated menu item structs
 };
 
-
 struct Menu* menu_init(struct Menu *parent);
+struct Menu* menu_add_submenu(struct Menu *parent, struct Menu *sub, const char *title);
 struct MenuItem* menu_add_item(struct Menu *menu, const char *title);
 void menu_debug(struct Menu *menu);
-struct Menu* menu_add_submenu(struct Menu *parent, struct Menu *sub, const char *title);
-struct MenuItem* menu_get_nth_item(struct Menu *menu, uint8_t line);
-
-/* A Menu has MenuItem's and a MenuItem can hold a submenu (struct Menu) */
-struct MenuItem* menu_item_init(const char *title);
-void menu_item_add_submenu(struct MenuItem *item, struct Menu *menu);
-uint8_t menu_item_is_submenu(struct MenuItem *item);
 
 /* ViewPort provides a view on the menu data */
 struct ViewPort vp_init(uint8_t max_cols, uint8_t max_lines);
-void vp_print(struct ViewPort *vp, struct Menu *menu);
+void vp_debug(struct ViewPort *vp, struct Menu *menu);
 
 struct MenuItem* vp_get_selected(struct ViewPort *vp, struct Menu *menu);
 struct MenuItem* vp_get_line(struct ViewPort *vp, struct Menu *menu, uint8_t line);
-void vp_reset(struct ViewPort *vp, uint8_t new_pos);
 
-/* Viewport navigation */
+/* Viewport navigation, go to prev/next position in menu */
 void vp_next(struct ViewPort *vp, struct Menu *menu);
 void vp_prev(struct ViewPort *vp, struct Menu *menu);
 struct Menu* vp_handle_select(struct ViewPort *vp, struct Menu *menu);

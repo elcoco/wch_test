@@ -102,11 +102,11 @@ int main()
             switch (enc0.dir) {
                 case R_DIR_CW:
                     vp_next(&vp, *menu);
-                    vp_print(&vp, *menu);
+                    vp_debug(&vp, *menu);
                     break;
                 case R_DIR_CCW:
                     vp_prev(&vp, *menu);
-                    vp_print(&vp, *menu);
+                    vp_debug(&vp, *menu);
                     break;
             }
             printf("enc0: %d\n", enc0.n_clicks);
