@@ -1,64 +1,151 @@
 #include "menu.h"
 
 static void menu_debug_rec(struct Menu *menu, uint8_t level);
+static struct MenuPool menu_pool_init();
+static struct MenuItem* menu_pool_get_item();
+static struct Menu* menu_pool_get_menu();
 
 
-struct Menu menu_init()
+struct MenuPool pool;
+
+static struct MenuPool menu_pool_init()
 {
-    struct Menu menu;
-    menu.n_items = 0;
-    for (int i=0 ; i<MENU_MAX_ITEMS ; i++)
-        menu.items[i] = NULL;
-    return menu;
+    struct MenuPool pool;
+    pool.menus_alloc = 0;
+    pool.items_alloc = 0;
+    return pool;
 }
 
-enum MenuStatus menu_add_item(struct Menu *menu, struct MenuItem *item)
+static struct MenuItem* menu_pool_get_item()
 {
-    if (menu->n_items >= MENU_MAX_ITEMS)
-        return MENU_STATUS_OOB;
-    menu->items[(menu->n_items)++] = item;
-    item->parent = menu;
-    return MENU_STATUS_OK;
+    static int counter = 0;
+    if (pool.items_alloc >= MENU_ITEM_POOL_MAX-1) {
+        printf("No more item's... sadge...\n");
+        return NULL;
+    }
+    return &(pool.item_pool[pool.items_alloc++]);
+}
+
+static struct Menu* menu_pool_get_menu()
+{
+    if (pool.menus_alloc >= MENU_POOL_MAX-1) {
+        printf("No more menu's... sadge...\n");
+        return NULL;
+    }
+    return &(pool.menu_pool[pool.menus_alloc++]);
 }
 
 static void menu_debug_rec(struct Menu *menu, uint8_t level)
+/* Recursive iter over menu and printf */
+// NOTE: this is broken, fix first or your cat will die!
 {
-    /* Recursive iter over menu and printf */
     char spaces[32+1] = "";
-    for (int i=0 ; i<level ; i++)
+    for (int i=0 ; i<level*4 ; i++)
         strncat(spaces, " ", 32);
 
-    for (int i=0 ; i<MENU_MAX_ITEMS ; i++) {
-        if (menu->items[i] == NULL)
-            break;
-
-        printf("%s%s\n", spaces, menu->items[i]->title);
-        if (menu_item_is_submenu(menu->items[i]))
-            menu_debug_rec(menu->items[i]->sub_menu, level+1);
+    struct MenuItem *item = menu->item;
+    while (item->next != NULL) {
+        printf("%s%s\n", spaces, item->title);
+        if (menu_item_is_submenu(item))
+            menu_debug_rec(item->sub_menu, level+1);
+        item = item->next;
     }
+    //    if ((item = menu_pool_get_item()) == NULL)
+    //        return;
+
+    //for (int i=0 ; i<MENU_MAX_ITEMS ; i++) {
+    //    struct MenuItem *item;
+    //    if ((item = menu_pool_get_item()) == NULL)
+    //        return;
+
+    //    printf("%s%s\n", spaces, item->title);
+    //    if (menu_item_is_submenu(item))
+    //        menu_debug_rec(item->sub_menu, level+1);
+    //}
 }
 
 void menu_debug(struct Menu *menu)
 {
-    printf("\n");
+    printf("DEBUG\n");
     menu_debug_rec(menu, 0);
     printf("\n");
 }
 
-struct MenuItem menu_item_init(const char *title, const char id)
+struct Menu* menu_init(struct Menu *parent)
+    /* If menu is root menu, parent must be NULL.
+     * Since we're not doing any dynamic memory stuff, the "item" struct will be the "go back to parent"
+     * item. Leave as NULL if no parent. */
 {
-    struct MenuItem item;
-    item.title = title;
-    item.id = id;
-    item.sub_menu = NULL;
-    item.parent = NULL;
+    // Initialize storage for menu items only once
+    static uint8_t is_initialized = 0;
+    if (!is_initialized) {
+        pool = menu_pool_init();
+        is_initialized = 1;
+    }
+
+    struct Menu *menu;
+    if ((menu = menu_pool_get_menu()) == NULL)
+        return NULL;
+
+    // head of linked list
+    menu->item = NULL;
+    menu->n_items = 0;
+
+    if (parent) {
+        struct MenuItem *item;
+        if ((item = menu_add_item(menu, MENU_BACK_STR)) != NULL)
+            item->parent = parent;
+        else
+            printf("Failed to add item\n");
+    }
+    return menu;
+}
+
+struct MenuItem* menu_add_item(struct Menu *menu, const char *title)
+{
+    struct MenuItem *item;
+    if ((item = menu_item_init(title)) == NULL)
+        return NULL;
+
+    // Find last menu item in linked list and add new item to it
+    if (menu->item) {
+        struct MenuItem *item_last = menu->item;
+        while (item_last->next != NULL)
+            item_last = item_last->next;
+        item_last->next = item;
+    }
+    else {
+        menu->item = item;
+    }
+
+    item->parent = menu;
+    menu->n_items++;
     return item;
 }
 
-enum MenuStatus menu_item_add_submenu(struct MenuItem *item, struct Menu *menu)
+struct Menu* menu_add_submenu(struct Menu *parent, struct Menu *sub, const char *title)
+/* Add a menu item to menu->items containing another menu */
 {
-    item->sub_menu = menu;
-    return MENU_STATUS_OK;
+    struct MenuItem *item;
+    if ((item = menu_add_item(parent, title)) == NULL)
+        return NULL;
+
+    item->sub_menu = sub;
+    return sub;
+}
+
+struct MenuItem* menu_item_init(const char *title)
+{
+    struct MenuItem *item;
+    if ((item = menu_pool_get_item()) == NULL)
+        return NULL;
+
+    memset(item, 0, sizeof(struct MenuItem));
+    strncpy(item->title, title, MENU_MAX_TITLE);
+    item->sub_menu = NULL;
+    item->parent = NULL;
+    item->next = NULL;
+    return item;
 }
 
 uint8_t menu_item_is_submenu(struct MenuItem *item)
@@ -78,14 +165,16 @@ struct ViewPort vp_init(uint8_t max_cols, uint8_t max_lines)
 }
 
 enum MenuStatus vp_print(struct ViewPort *vp, struct Menu *menu)
+    /* Print out menu to serial, might delete later. */
 {
     for (int i=vp->line_start ; i<=vp->line_end ; i++) {
-        if (menu->items[i] == NULL)
+        struct MenuItem *item;
+        if ((item = vp_get_line(vp, menu, i)) == NULL)
             break;
         if (i == vp->pos)
-            printf("> %d: %s\n", i, menu->items[i]->title);
+            printf("> %d: %s\n", i, item->title);
         else
-            printf("  %d: %s\n", i, menu->items[i]->title);
+            printf("  %d: %s\n", i, item->title);
     }
     printf("---------\n");
 
@@ -121,15 +210,51 @@ void vp_down(struct ViewPort *vp, struct Menu *menu)
 struct MenuItem* vp_get_selected(struct ViewPort *vp, struct Menu *menu)
     /* Return selected menu item from viewport */
 {
-    return menu->items[vp->pos];
+    return vp_get_line(vp, menu, vp->pos);
+    //return menu->items[vp->pos];
 }
 
 struct MenuItem* vp_get_line(struct ViewPort *vp, struct Menu *menu, uint8_t line)
-    /* Return nth menu item from viewport */
+    /* Return nth menu item from viewport.
+     * Meaning: line number relative to visible menu size. */
 {
-    if (line < 0 || line >= vp->max_lines)
+    struct MenuItem *item = menu->item;
+    uint8_t i = 0;
+
+    // Find nth item within visible range
+    for (item=menu->item ; item ; item=item->next, i++) {
+        if (i == line)
+            return item;
+    }
+
+    return NULL;
+}
+
+void vp_reset(struct ViewPort *vp)
+    /* Reset position of viewport */
+{
+    vp->pos = 0;
+    vp->line_start = 0;
+    vp->line_end = vp->max_lines-1;
+}
+
+struct Menu* vp_handle_select(struct ViewPort *vp, struct Menu *menu)
+    /* Handle select of menu option, return resulting menu */
+{
+    struct MenuItem *selected = vp_get_selected(vp, menu);
+    if (strncmp(selected->title, MENU_BACK_STR, MENU_MAX_TITLE) == 0) {
+        printf("go back\n");
+        // TODO: put viewport position to point to previous location
+        return selected->parent;
+    }
+    else if (menu_item_is_submenu(selected)) {
+        printf("go in sub\n");
+        // TODO: backup viewport position so we can restore it when going back
+        return selected->sub_menu;
+
+    }
+    else
         return NULL;
-    return menu->items[vp->line_start + line];
 }
 
 

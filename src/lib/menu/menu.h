@@ -5,29 +5,41 @@
 #include <string.h>
 #include <stdio.h>
 
-#define MENU_MAX_ITEMS 20
 #define MENU_MAX_TITLE 32
+#define MENU_BACK_STR "<-- back"
+
+// Create a pool of items that is used to allocate space for menu items.
+// This way we don't have to reserve a lot of memory for every menu.
+#define MENU_ITEM_POOL_MAX 16 
+#define MENU_POOL_MAX 5 
 
 /* A viewport gives a view on the menu data. It handles navigating the menu
  * and maintains a position */
 struct ViewPort {
-    uint8_t line_start;     // i of first visible line
-    uint8_t line_end;       // i of last visible line
-    uint8_t pos;         // Current position in menu
-    uint8_t max_cols;   // Max menu item length
-    uint8_t max_lines;   // Max visible lines
+    uint8_t line_start;     // Absolute i of first visible line
+    uint8_t line_end;       // Absolute i of last visible line
+    uint8_t pos;            // Current absolute position in menu
+    uint8_t max_cols;       // Max menu item length
+    uint8_t max_lines;      // Max visible lines
 };
 
 struct Menu {
-    struct MenuItem *items[MENU_MAX_ITEMS];
-    uint8_t n_items;
+    struct MenuItem *item;    // Linked list head
+    uint8_t n_items;          // Amount of items in linked list
 };
 
 struct MenuItem {
-    const char *title;
-    char id;
-    struct Menu *sub_menu;      // menu item can be a submenu
-    struct Menu *parent;
+    char title[MENU_MAX_TITLE];
+    struct MenuItem *next;      // pointer of next item in linked list
+    struct Menu *sub_menu;      // menu item can contain a submenu
+    struct Menu *parent;        // pointer to parent menu
+};
+
+struct MenuPool {
+    struct MenuItem item_pool[MENU_ITEM_POOL_MAX];
+    struct Menu menu_pool[MENU_POOL_MAX];
+    size_t menus_alloc;
+    size_t items_alloc;
 };
 
 enum MenuStatus {
@@ -36,20 +48,28 @@ enum MenuStatus {
     MENU_STATUS_ERROR = -2
 };
 
-struct Menu menu_init();
-enum MenuStatus menu_add_item(struct Menu *menu, struct MenuItem *item);
+struct Menu* menu_init(struct Menu *parent);
+struct MenuItem* menu_add_item(struct Menu *menu, const char *title);
 void menu_debug(struct Menu *menu);
+struct Menu* menu_add_submenu(struct Menu *parent, struct Menu *sub, const char *title);
 
-struct MenuItem menu_item_init(const char *title, const char id);
+/* A Menu has MenuItem's and a MenuItem can hold a submenu (struct Menu) */
+struct MenuItem* menu_item_init(const char *title);
 enum MenuStatus menu_item_add_submenu(struct MenuItem *item, struct Menu *menu);
 uint8_t menu_item_is_submenu(struct MenuItem *item);
 
+
+/* ViewPort provides a view on the menu data */
 struct ViewPort vp_init(uint8_t max_cols, uint8_t max_lines);
 enum MenuStatus vp_print(struct ViewPort *vp, struct Menu *menu);
 
-void vp_up(struct ViewPort *vp, struct Menu *menu);
-void vp_down(struct ViewPort *vp, struct Menu *menu);
 struct MenuItem* vp_get_selected(struct ViewPort *vp, struct Menu *menu);
 struct MenuItem* vp_get_line(struct ViewPort *vp, struct Menu *menu, uint8_t line);
+void vp_reset(struct ViewPort *vp);
+
+/* Viewport navigation */
+void vp_up(struct ViewPort *vp, struct Menu *menu);
+void vp_down(struct ViewPort *vp, struct Menu *menu);
+struct Menu* vp_handle_select(struct ViewPort *vp, struct Menu *menu);
 
 #endif /* ifndef MENU_H */

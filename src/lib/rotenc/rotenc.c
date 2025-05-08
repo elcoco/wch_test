@@ -115,11 +115,11 @@ struct RotEnc re_init()
     /* GPIOB ----> EXTI_Line5 */
     GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource5);
 
-    // Should set bit 0 of EXTI->EXTI_INTFR when externally triggered
-    EXTI_InitStructure.EXTI_Line = EXTI_Line3 | EXTI_Line4 | EXTI_Line5;
+    // Encoder :: Should set bit 0 of EXTI->EXTI_INTFR when externally triggered
+    EXTI_StructInit(&EXTI_InitStructure);
+    EXTI_InitStructure.EXTI_Line = EXTI_Line3 | EXTI_Line4;
     EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
     EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-    //EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
     EXTI_InitStructure.EXTI_LineCmd = ENABLE;
     EXTI_Init(&EXTI_InitStructure);
 
@@ -134,6 +134,14 @@ struct RotEnc re_init()
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_Init(&NVIC_InitStructure);
+
+    // Button
+    EXTI_StructInit(&EXTI_InitStructure);
+    EXTI_InitStructure.EXTI_Line = EXTI_Line5;
+    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    EXTI_Init(&EXTI_InitStructure);
 
     NVIC_InitStructure.NVIC_IRQChannel = EXTI9_5_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;

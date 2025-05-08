@@ -2,6 +2,7 @@
 #define ROTENC_H
 
 #include <ch32v20x.h>
+#include "ch32v20x_exti.h"
 #include <debug.h>
 #include <string.h>
 
