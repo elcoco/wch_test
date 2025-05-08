@@ -1,40 +1,33 @@
 #include "menu.h"
 
 static void menu_debug_rec(struct Menu *menu, uint8_t level);
-static struct MenuPool menu_pool_init();
-static struct MenuItem* menu_pool_get_item();
-static struct Menu* menu_pool_get_menu();
 static void vp_reset(struct ViewPort *vp, uint8_t new_pos);
 static struct MenuItem* menu_get_nth_item(struct Menu *menu, uint8_t line);
 static struct MenuItem* menu_item_init(const char *title);
+static struct MenuItem* item_pool_alloc_item();
+static struct Menu* menu_pool_alloc_menu();
+
+// Storage pool for menus and menu items
+static struct StoragePool item_pool;
+static struct StoragePool menu_pool;
 
 
-struct MenuPool pool;
-
-static struct MenuPool menu_pool_init()
+static struct MenuItem* item_pool_alloc_item()
 {
-    struct MenuPool pool;
-    pool.menus_alloc = 0;
-    pool.items_alloc = 0;
-    return pool;
-}
-
-static struct MenuItem* menu_pool_get_item()
-{
-    if (pool.items_alloc >= MENU_ITEM_POOL_MAX-1) {
-        printf("No more item's... sadge...\n");
+    if (item_pool.n_alloc >= item_pool.size) {
+        printf("No more items... sadge...\n");
         return NULL;
     }
-    return &(pool.item_pool[pool.items_alloc++]);
+    return &(item_pool.pool.item_pool[item_pool.n_alloc++]);
 }
 
-static struct Menu* menu_pool_get_menu()
+static struct Menu* menu_pool_alloc_menu()
 {
-    if (pool.menus_alloc >= MENU_POOL_MAX-1) {
-        printf("No more menu's... sadge...\n");
+    if (menu_pool.n_alloc >= menu_pool.size) {
+        printf("No more menus... sadge...\n");
         return NULL;
     }
-    return &(pool.menu_pool[pool.menus_alloc++]);
+    return &(menu_pool.pool.menu_pool[menu_pool.n_alloc++]);
 }
 
 static struct MenuItem* menu_get_nth_item(struct Menu *menu, uint8_t line)
@@ -55,11 +48,12 @@ static struct MenuItem* menu_get_nth_item(struct Menu *menu, uint8_t line)
 static struct MenuItem* menu_item_init(const char *title)
 {
     struct MenuItem *item;
-    if ((item = menu_pool_get_item()) == NULL)
+    if ((item = item_pool_alloc_item()) == NULL)
         return NULL;
 
     memset(item, 0, sizeof(struct MenuItem));
-    strncpy(item->title, title, MENU_MAX_TITLE);
+    //strncpy(item->title, title, MENU_MAX_TITLE);
+    item->title = title;
     item->sub_menu = NULL;
     item->parent = NULL;
     item->next = NULL;
@@ -91,11 +85,17 @@ static void menu_debug_rec(struct Menu *menu, uint8_t level)
     }
 }
 
-void menu_debug(struct Menu *menu)
+void pool_init(struct Menu *mpool, size_t menu_size, struct MenuItem *ipool, size_t item_size)
+    /* We don't want to use malloc so we maintain a stack of structs.
+     * The caller is responsible for the storage of all menu's and menu items */
 {
-    printf("DEBUG\n");
-    menu_debug_rec(menu, 0);
-    printf("\n");
+    menu_pool.pool.menu_pool = mpool;
+    menu_pool.n_alloc = 0;
+    menu_pool.size = menu_size;
+
+    item_pool.pool.item_pool = ipool;
+    item_pool.n_alloc = 0;
+    item_pool.size = item_size;
 }
 
 struct Menu* menu_init(struct Menu *parent)
@@ -103,15 +103,8 @@ struct Menu* menu_init(struct Menu *parent)
      * Since we're not doing any dynamic memory stuff, the "item" struct will be the "go back to parent"
      * item. Leave as NULL if no parent. */
 {
-    // Initialize storage for menu items only once
-    static uint8_t is_initialized = 0;
-    if (!is_initialized) {
-        pool = menu_pool_init();
-        is_initialized = 1;
-    }
-
     struct Menu *menu;
-    if ((menu = menu_pool_get_menu()) == NULL)
+    if ((menu = menu_pool_alloc_menu()) == NULL)
         return NULL;
 
     // head of linked list
@@ -127,6 +120,13 @@ struct Menu* menu_init(struct Menu *parent)
             printf("Failed to add item\n");
     }
     return menu;
+}
+
+void menu_debug(struct Menu *menu)
+{
+    printf("DEBUG\n");
+    menu_debug_rec(menu, 0);
+    printf("\n");
 }
 
 struct MenuItem* menu_add_item(struct Menu *menu, const char *title)

@@ -13,11 +13,12 @@
 
 struct RotEnc enc0;
 
-//#define MENU_ITEM_POOL_MAX 32 
-//#define MENU_POOL_MAX 5
-//
-//struct MenuItem item_pool[MENU_ITEM_POOL_MAX];
-//struct Menu menu_pool[MENU_POOL_MAX];
+// Storage for menu library
+#define MENU_POOL_MAX 5
+#define ITEM_POOL_MAX 32
+
+struct MenuItem item_pool[ITEM_POOL_MAX];
+struct Menu menu_pool[MENU_POOL_MAX];
 
 // WCH-Interrupt-fast enables saving/restoring hardware registers when entering/leaving
 // interrupt (Hardware Preamble/Epilogue HPE)
@@ -33,21 +34,21 @@ void setup_menu(struct Menu *root)
     printf("Init menu\n");
 
     struct Menu *sub0 = menu_init(root);
+    menu_add_item(sub0, "sub0_item0");
+    menu_add_item(sub0, "sub0_item1");
+    menu_add_item(sub0, "sub0_item2");
 
+    menu_add_submenu(root, sub0, "bever sub");
     menu_add_item(root, "item0");
     menu_add_item(root, "item1");
     menu_add_item(root, "item2");
     menu_add_item(root, "item3");
     menu_add_item(root, "item4");
-    menu_add_submenu(root, sub0, "bever sub");
     menu_add_item(root, "item5");
     menu_add_item(root, "item6");
     menu_add_item(root, "item7");
     menu_add_item(root, "item8");
     menu_add_item(root, "item9");
-    menu_add_item(sub0, "sub0_item0");
-    menu_add_item(sub0, "sub0_item1");
-    menu_add_item(sub0, "sub0_item2");
 }
 
 void oled_print_menu(struct Oled *oled, struct ViewPort *vp, struct Menu *menu)
@@ -73,6 +74,7 @@ int main()
 
     re_init(&enc0);
 
+    pool_init(menu_pool, MENU_POOL_MAX, item_pool, ITEM_POOL_MAX);
     struct Menu *root = menu_init(NULL);
     struct ViewPort vp = vp_init(10, 7);
     setup_menu(root);

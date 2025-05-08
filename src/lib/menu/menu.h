@@ -31,18 +31,22 @@ struct Menu {
 };
 
 struct MenuItem {
-    char title[MENU_MAX_TITLE];
-    struct MenuItem *next;      // pointer of next item in linked list
-    struct Menu *sub_menu;      // menu item can contain a submenu
-    struct Menu *parent;        // pointer to parent menu
+    const char *title;
+    struct MenuItem *next;      // Pointer to next item in linked list
+    struct Menu *sub_menu;      // Menu item can contain a submenu
+    struct Menu *parent;        // Pointer to parent menu
 };
 
-struct MenuPool {
-    struct MenuItem item_pool[MENU_ITEM_POOL_MAX];
-    struct Menu menu_pool[MENU_POOL_MAX];
-    size_t menus_alloc;         // Amount of allocated menu structs
-    size_t items_alloc;         // Amount of allocated menu item structs
+struct StoragePool {
+    union {
+        struct Menu *menu_pool;      // in case of menu pool
+        struct MenuItem *item_pool;  // in case of menu item pool
+    } pool;
+    size_t n_alloc;         // Amount of allocated structs in pool
+    size_t size;
 };
+
+void pool_init(struct Menu *mpool, size_t menu_size, struct MenuItem *ipool, size_t item_size);
 
 struct Menu* menu_init(struct Menu *parent);
 struct Menu* menu_add_submenu(struct Menu *parent, struct Menu *sub, const char *title);
