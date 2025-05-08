@@ -18,7 +18,6 @@ static struct MenuPool menu_pool_init()
 
 static struct MenuItem* menu_pool_get_item()
 {
-    static int counter = 0;
     if (pool.items_alloc >= MENU_ITEM_POOL_MAX-1) {
         printf("No more item's... sadge...\n");
         return NULL;
@@ -50,18 +49,6 @@ static void menu_debug_rec(struct Menu *menu, uint8_t level)
             menu_debug_rec(item->sub_menu, level+1);
         item = item->next;
     }
-    //    if ((item = menu_pool_get_item()) == NULL)
-    //        return;
-
-    //for (int i=0 ; i<MENU_MAX_ITEMS ; i++) {
-    //    struct MenuItem *item;
-    //    if ((item = menu_pool_get_item()) == NULL)
-    //        return;
-
-    //    printf("%s%s\n", spaces, item->title);
-    //    if (menu_item_is_submenu(item))
-    //        menu_debug_rec(item->sub_menu, level+1);
-    //}
 }
 
 void menu_debug(struct Menu *menu)
@@ -90,6 +77,7 @@ struct Menu* menu_init(struct Menu *parent)
     // head of linked list
     menu->item = NULL;
     menu->n_items = 0;
+    menu->prev_pos = -1;
 
     if (parent) {
         struct MenuItem *item;
@@ -120,6 +108,21 @@ struct MenuItem* menu_add_item(struct Menu *menu, const char *title)
 
     item->parent = menu;
     menu->n_items++;
+    return item;
+}
+
+struct MenuItem* menu_get_nth_item(struct Menu *menu, uint8_t line)
+{
+    /* Get absolute item in linked list by index. */
+    if (line >= menu->n_items)      // OOB
+        return NULL;
+
+    struct MenuItem *item = menu->item;
+    for (uint8_t i=0 ; i<line; i++) {
+        if (item == NULL)
+            return NULL;
+        item = item->next;
+    }
     return item;
 }
 
@@ -164,12 +167,12 @@ struct ViewPort vp_init(uint8_t max_cols, uint8_t max_lines)
     return vp;
 }
 
-enum MenuStatus vp_print(struct ViewPort *vp, struct Menu *menu)
+void vp_print(struct ViewPort *vp, struct Menu *menu)
     /* Print out menu to serial, might delete later. */
 {
     for (int i=vp->line_start ; i<=vp->line_end ; i++) {
         struct MenuItem *item;
-        if ((item = vp_get_line(vp, menu, i)) == NULL)
+        if ((item = menu_get_nth_item(menu, i)) == NULL)
             break;
         if (i == vp->pos)
             printf("> %d: %s\n", i, item->title);
@@ -177,11 +180,9 @@ enum MenuStatus vp_print(struct ViewPort *vp, struct Menu *menu)
             printf("  %d: %s\n", i, item->title);
     }
     printf("---------\n");
-
-    return MENU_STATUS_OK;
 }
 
-void vp_up(struct ViewPort *vp, struct Menu *menu)
+void vp_next(struct ViewPort *vp, struct Menu *menu)
 {
     // Is on first line
     if (vp->pos == 0)
@@ -194,7 +195,7 @@ void vp_up(struct ViewPort *vp, struct Menu *menu)
     }
 }
 
-void vp_down(struct ViewPort *vp, struct Menu *menu)
+void vp_prev(struct ViewPort *vp, struct Menu *menu)
 {
     // Is on last line
     if (vp->pos == menu->n_items-1)
@@ -210,32 +211,21 @@ void vp_down(struct ViewPort *vp, struct Menu *menu)
 struct MenuItem* vp_get_selected(struct ViewPort *vp, struct Menu *menu)
     /* Return selected menu item from viewport */
 {
-    return vp_get_line(vp, menu, vp->pos);
-    //return menu->items[vp->pos];
+    return menu_get_nth_item(menu, vp->pos);
 }
 
 struct MenuItem* vp_get_line(struct ViewPort *vp, struct Menu *menu, uint8_t line)
-    /* Return nth menu item from viewport.
-     * Meaning: line number relative to visible menu size. */
+    /* Get relative item in linked list by index. */
 {
-    struct MenuItem *item = menu->item;
-    uint8_t i = 0;
-
-    // Find nth item within visible range
-    for (item=menu->item ; item ; item=item->next, i++) {
-        if (i == line)
-            return item;
-    }
-
-    return NULL;
+    return menu_get_nth_item(menu, vp->line_start + line);
 }
 
-void vp_reset(struct ViewPort *vp)
-    /* Reset position of viewport */
+void vp_reset(struct ViewPort *vp, uint8_t new_pos)
+    /* Set new_pos as first option in menu, 0 to reset */
 {
-    vp->pos = 0;
-    vp->line_start = 0;
-    vp->line_end = vp->max_lines-1;
+    vp->pos = new_pos;
+    vp->line_start = new_pos;
+    vp->line_end = new_pos + vp->max_lines;
 }
 
 struct Menu* vp_handle_select(struct ViewPort *vp, struct Menu *menu)
@@ -244,30 +234,16 @@ struct Menu* vp_handle_select(struct ViewPort *vp, struct Menu *menu)
     struct MenuItem *selected = vp_get_selected(vp, menu);
     if (strncmp(selected->title, MENU_BACK_STR, MENU_MAX_TITLE) == 0) {
         printf("go back\n");
-        // TODO: put viewport position to point to previous location
+        vp_reset(vp, selected->parent->prev_pos);
+        menu->prev_pos = -1;
         return selected->parent;
     }
     else if (menu_item_is_submenu(selected)) {
         printf("go in sub\n");
-        // TODO: backup viewport position so we can restore it when going back
+        menu->prev_pos = vp->pos;
+        vp_reset(vp, 0);
         return selected->sub_menu;
-
     }
     else
         return NULL;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

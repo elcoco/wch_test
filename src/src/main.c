@@ -45,7 +45,6 @@ void setup_menu(struct Menu *root)
     menu_add_item(root, "item7");
     menu_add_item(root, "item8");
     menu_add_item(root, "item9");
-
     menu_add_item(sub0, "sub0_item0");
     menu_add_item(sub0, "sub0_item1");
     menu_add_item(sub0, "sub0_item2");
@@ -75,7 +74,7 @@ int main()
     re_init(&enc0);
 
     struct Menu *root = menu_init(NULL);
-    struct ViewPort vp = vp_init(10, 8);
+    struct ViewPort vp = vp_init(10, 7);
     setup_menu(root);
     menu_debug(root);
 
@@ -102,11 +101,11 @@ int main()
             enc0.is_triggered = 0;
             switch (enc0.dir) {
                 case R_DIR_CW:
-                    vp_down(&vp, *menu);
+                    vp_next(&vp, *menu);
                     vp_print(&vp, *menu);
                     break;
                 case R_DIR_CCW:
-                    vp_up(&vp, *menu);
+                    vp_prev(&vp, *menu);
                     vp_print(&vp, *menu);
                     break;
             }
@@ -119,7 +118,7 @@ int main()
             struct Menu *sel;
             if ((sel = vp_handle_select(&vp, *menu)) != NULL) {
                 *menu = sel;
-                vp_reset(&vp);
+                //vp_reset(&vp);
             }
             else {
                 printf("execute\n");
