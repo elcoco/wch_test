@@ -30,11 +30,13 @@ struct Menu {
                               // used to return to previous position when going one level up
 };
 
+/* A menuitem can be either a submenu or an endpoint */
 struct MenuItem {
     const char *title;
     struct MenuItem *next;      // Pointer to next item in linked list
     struct Menu *sub_menu;      // Menu item can contain a submenu
     struct Menu *parent;        // Pointer to parent menu
+    void (*on_clicked)(struct MenuItem*); // Fuction pointer to handle click action
 };
 
 struct StoragePool {
@@ -50,7 +52,7 @@ void pool_init(struct Menu *mpool, size_t menu_size, struct MenuItem *ipool, siz
 
 struct Menu* menu_init(struct Menu *parent);
 struct Menu* menu_add_submenu(struct Menu *parent, struct Menu *sub, const char *title);
-struct MenuItem* menu_add_item(struct Menu *menu, const char *title);
+struct MenuItem* menu_add_item(struct Menu *menu, const char *title, void (*on_clicked)(struct MenuItem*));
 void menu_debug(struct Menu *menu);
 
 /* ViewPort provides a view on the menu data */
@@ -63,6 +65,6 @@ struct MenuItem* vp_get_line(struct ViewPort *vp, struct Menu *menu, uint8_t lin
 /* Viewport navigation, go to prev/next position in menu */
 void vp_next(struct ViewPort *vp, struct Menu *menu);
 void vp_prev(struct ViewPort *vp, struct Menu *menu);
-struct Menu* vp_handle_select(struct ViewPort *vp, struct Menu *menu);
+struct Menu* vp_handle_clicked(struct ViewPort *vp, struct Menu *menu);
 
 #endif /* ifndef MENU_H */

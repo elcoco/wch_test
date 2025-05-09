@@ -28,27 +28,31 @@ void EXTI3_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void EXTI4_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void EXTI9_5_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 
+void on_item_clicked_cb(struct MenuItem *self)
+{
+    printf("Clicked: %s\n", self->title);
+}
 
 void setup_menu(struct Menu *root)
 {
     printf("Init menu\n");
 
     struct Menu *sub0 = menu_init(root);
-    menu_add_item(sub0, "sub0_item0");
-    menu_add_item(sub0, "sub0_item1");
-    menu_add_item(sub0, "sub0_item2");
+    menu_add_item(sub0, "sub0_item0", &on_item_clicked_cb);
+    menu_add_item(sub0, "sub0_item1", &on_item_clicked_cb);
+    menu_add_item(sub0, "sub0_item2", &on_item_clicked_cb);
 
     menu_add_submenu(root, sub0, "bever sub");
-    menu_add_item(root, "item0");
-    menu_add_item(root, "item1");
-    menu_add_item(root, "item2");
-    menu_add_item(root, "item3");
-    menu_add_item(root, "item4");
-    menu_add_item(root, "item5");
-    menu_add_item(root, "item6");
-    menu_add_item(root, "item7");
-    menu_add_item(root, "item8");
-    menu_add_item(root, "item9");
+    menu_add_item(root, "item0", &on_item_clicked_cb);
+    menu_add_item(root, "item1", &on_item_clicked_cb);
+    menu_add_item(root, "item2_abcdefghijklmnopqrstuvwxyz", &on_item_clicked_cb);
+    menu_add_item(root, "item3", &on_item_clicked_cb);
+    menu_add_item(root, "item4", &on_item_clicked_cb);
+    menu_add_item(root, "item5", &on_item_clicked_cb);
+    menu_add_item(root, "item6", &on_item_clicked_cb);
+    menu_add_item(root, "item7 lkjlkllllllllllllllllllllllllll", &on_item_clicked_cb);
+    menu_add_item(root, "item8", &on_item_clicked_cb);
+    menu_add_item(root, "item9", &on_item_clicked_cb);
 }
 
 void oled_print_menu(struct Oled *oled, struct ViewPort *vp, struct Menu *menu)
@@ -118,7 +122,7 @@ int main()
             printf("clicked\n");
 
             struct Menu *sel;
-            if ((sel = vp_handle_select(&vp, *menu)) != NULL) {
+            if ((sel = vp_handle_clicked(&vp, *menu)) != NULL) {
                 *menu = sel;
                 //vp_reset(&vp);
             }

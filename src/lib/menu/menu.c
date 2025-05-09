@@ -3,7 +3,7 @@
 static void menu_debug_rec(struct Menu *menu, uint8_t level);
 static void vp_reset(struct ViewPort *vp, uint8_t new_pos);
 static struct MenuItem* menu_get_nth_item(struct Menu *menu, uint8_t line);
-static struct MenuItem* menu_item_init(const char *title);
+static struct MenuItem* menu_item_init(const char *title, void (*on_clicked)(struct MenuItem*));
 static struct MenuItem* item_pool_alloc_item();
 static struct Menu* menu_pool_alloc_menu();
 
@@ -45,7 +45,7 @@ static struct MenuItem* menu_get_nth_item(struct Menu *menu, uint8_t line)
     return item;
 }
 
-static struct MenuItem* menu_item_init(const char *title)
+static struct MenuItem* menu_item_init(const char *title, void (*on_clicked)(struct MenuItem*))
 {
     struct MenuItem *item;
     if ((item = item_pool_alloc_item()) == NULL)
@@ -57,6 +57,7 @@ static struct MenuItem* menu_item_init(const char *title)
     item->sub_menu = NULL;
     item->parent = NULL;
     item->next = NULL;
+    item->on_clicked = on_clicked;
     return item;
 }
 
@@ -114,7 +115,7 @@ struct Menu* menu_init(struct Menu *parent)
 
     if (parent) {
         struct MenuItem *item;
-        if ((item = menu_add_item(menu, MENU_BACK_STR)) != NULL)
+        if ((item = menu_add_item(menu, MENU_BACK_STR, NULL)) != NULL)
             item->parent = parent;
         else
             printf("Failed to add item\n");
@@ -129,10 +130,10 @@ void menu_debug(struct Menu *menu)
     printf("\n");
 }
 
-struct MenuItem* menu_add_item(struct Menu *menu, const char *title)
+struct MenuItem* menu_add_item(struct Menu *menu, const char *title, void (*on_clicked)(struct MenuItem*))
 {
     struct MenuItem *item;
-    if ((item = menu_item_init(title)) == NULL)
+    if ((item = menu_item_init(title, on_clicked)) == NULL)
         return NULL;
 
     // Find last menu item in linked list and add new item to it
@@ -155,7 +156,7 @@ struct Menu* menu_add_submenu(struct Menu *parent, struct Menu *sub, const char 
 /* Add a menu item to menu->items containing another menu */
 {
     struct MenuItem *item;
-    if ((item = menu_add_item(parent, title)) == NULL)
+    if ((item = menu_add_item(parent, title, NULL)) == NULL)
         return NULL;
 
     item->sub_menu = sub;
@@ -227,20 +228,26 @@ struct MenuItem* vp_get_line(struct ViewPort *vp, struct Menu *menu, uint8_t lin
     return menu_get_nth_item(menu, vp->line_start + line);
 }
 
-struct Menu* vp_handle_select(struct ViewPort *vp, struct Menu *menu)
-    /* Handle select of menu option, return resulting menu */
+struct Menu* vp_handle_clicked(struct ViewPort *vp, struct Menu *menu)
+    /* Handle select of menu option, return resulting menu or NULL if endpoint is clicked. */
 {
     struct MenuItem *selected = vp_get_selected(vp, menu);
+    // Clicked on "go back" item, go up one level
     if (strncmp(selected->title, MENU_BACK_STR, MENU_MAX_TITLE) == 0) {
         vp_reset(vp, selected->parent->prev_pos); // Restore position
         menu->prev_pos = -1;
         return selected->parent;
     }
+    // Clicked on submenu, go into submenu
     else if (selected->sub_menu) {
         menu->prev_pos = vp->pos;                 // Backup position
         vp_reset(vp, 0);
         return selected->sub_menu;
     }
-    else
+    // Clicked on endpoint, run callback
+    else {
+        if (selected->on_clicked)
+            selected->on_clicked(selected);
         return NULL;
+    }
 }
