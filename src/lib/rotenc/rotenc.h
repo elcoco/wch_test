@@ -33,8 +33,6 @@ enum RotDirection {
     R_DIR_CW
 };
 
-
-
 struct RotEnc {
     u8 n_clicks;
     u8 is_triggered;

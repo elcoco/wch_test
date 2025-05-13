@@ -8,18 +8,13 @@
 #define MENU_MAX_TITLE 32
 #define MENU_BACK_STR "<-- back"
 
-// Create a pool of items that is used to allocate space for menu items.
-// This way we don't have to reserve a lot of memory for every menu.
-#define MENU_ITEM_POOL_MAX 20 
-#define MENU_POOL_MAX 5 
-
 /* A viewport gives a view on the menu data. It handles navigating the menu
  * and maintains a position */
 struct ViewPort {
     uint8_t line_start;     // Absolute i of first visible line
     uint8_t line_end;       // Absolute i of last visible line
     uint8_t pos;            // Current absolute position in menu
-    uint8_t max_cols;       // Max menu item length
+    uint8_t max_cols;       // Max visible menu item length
     uint8_t max_lines;      // Max visible lines
 };
 

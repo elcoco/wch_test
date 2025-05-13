@@ -157,6 +157,20 @@ enum OledStatus oled_set_chr(struct Oled *oled, u8 c)
     return OLED_STATUS_SUCCESS;
 }
 
+enum OledStatus oled_print(struct Oled *oled, u8 x, u8 y, const char *data)
+{
+    oled_set_pos(oled, x, y);
+    for (char *p=data ; *p!='\0' ; p++) {
+
+        // Do not wrap to next line
+        if (x + (p-data) >= OLED_XCHARS)
+            return OLED_STATUS_ERR_OVERFLOW;
+
+        oled_set_chr(oled, *p);
+    }
+    return OLED_STATUS_SUCCESS;
+}
+
 enum OledStatus oled_printf(struct Oled *oled, u8 x, u8 y, const char *fmt, ...)
 {
     char buf[OLED_MAX_PRINTF_BUF] = "";
@@ -164,17 +178,28 @@ enum OledStatus oled_printf(struct Oled *oled, u8 x, u8 y, const char *fmt, ...)
     va_start(args, fmt);
     vsnprintf(buf, OLED_MAX_PRINTF_BUF-1, fmt, args);
     va_end(args);
+    return oled_print(oled, x, y, buf);
+}
 
-    oled_set_pos(oled, x, y);
-    for (char *p=buf ; *p!='\0' ; p++) {
+enum OledStatus oled_printf_centered(struct Oled *oled, u8 x, u8 y, const char *fmt, ...)
+{
+    char buf[OLED_MAX_PRINTF_BUF] = "";
+    char buf_centered[OLED_MAX_PRINTF_BUF] = "";
 
-        // Do not wrap to next line
-        if (x + (p-buf) >= OLED_XCHARS)
-            return OLED_STATUS_ERR_OVERFLOW;
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, OLED_MAX_PRINTF_BUF-1, fmt, args);
+    va_end(args);
 
-        oled_set_chr(oled, *p);
-    }
-    return OLED_STATUS_SUCCESS;
+    if (strnlen(buf, OLED_MAX_PRINTF_BUF) >= OLED_XCHARS)
+        return oled_print(oled, x, y, buf);
+
+    int8_t lspaces = (OLED_XCHARS - strnlen(buf, OLED_MAX_PRINTF_BUF))/2;
+    for (int i=0 ; i<lspaces ; i++)
+        buf_centered[i] = ' ';
+
+    strncat(buf_centered, buf, OLED_XCHARS);
+    return oled_print(oled, x, y, buf_centered);
 }
 
 enum OledStatus oled_flush(struct Oled *oled)

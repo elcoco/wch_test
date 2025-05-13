@@ -85,6 +85,7 @@ enum OledStatus oled_flush(struct Oled *oled);
 enum OledStatus oled_set_chr(struct Oled *oled, u8 c);
 enum OledStatus oled_set_pos(struct Oled *oled, u8 x, u8 y);
 enum OledStatus oled_printf(struct Oled *oled, u8 x, u8 y, const char *fmt, ...);
+enum OledStatus oled_printf_centered(struct Oled *oled, u8 x, u8 y, const char *fmt, ...);
 enum OledStatus oled_set_inverted(struct Oled *oled, u8 value);
 enum OledStatus oled_set_px(struct Oled *oled, u8 x, u8 y);
 void oled_clear(struct Oled *oled);

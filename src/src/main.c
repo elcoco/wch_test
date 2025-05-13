@@ -12,6 +12,9 @@
 #include "menu.h"
 
 struct RotEnc enc0;
+struct Oled oled;
+struct Menu *root;
+struct ViewPort vp;
 
 // Storage for menu library
 #define MENU_POOL_MAX 5
@@ -28,10 +31,9 @@ void EXTI3_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void EXTI4_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 void EXTI9_5_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 
-void on_item_clicked_cb(struct MenuItem *self)
-{
-    printf("Clicked: %s\n", self->title);
-}
+void on_item_clicked_cb(struct MenuItem *self);
+void setup_menu(struct Menu *root);
+
 
 void setup_menu(struct Menu *root)
 {
@@ -62,11 +64,44 @@ void oled_print_menu(struct Oled *oled, struct ViewPort *vp, struct Menu *menu)
         if (item) {
             oled_clear_line(oled, i);
             if (vp_get_selected(vp, menu) == item)
-                oled_printf(oled, 0, i, "> %s", item->title);
+                oled_printf(oled, 0, i, ">%s", item->title);
             else
-                oled_printf(oled, 0, i, "  %s", item->title);
+                oled_printf(oled, 0, i, " %s", item->title);
         }
     }
+}
+
+void on_item_clicked_cb(struct MenuItem *self)
+{
+    printf("Clicked: %s\n", self->title);
+    oled_clear(&oled);
+    oled_printf_centered(&oled, 0, 4, "CLICKED %s MF!", self->title);
+    oled_flush(&oled);
+
+    Delay_Ms(2000);
+
+    oled_clear(&oled);
+    oled_print_menu(&oled, &vp, root);
+    oled_flush(&oled);
+}
+
+char* graph_bar(float value, float low, float high, char lchar, char rchar, char *buf, size_t length)
+    /* Get a nice graph bar that we can display when a menu item is selected */
+{
+    char *ptr = buf;
+    int8_t level = (value / (high-low)) * (length-2);
+    int i;
+
+    *ptr++ = '[';
+
+    for (i=0 ; i<level && i<length ; i++, ptr++)
+        *ptr = lchar;
+    for (; i<length-2 ; i++, ptr++)
+        *ptr = rchar;
+
+    *ptr++ = ']';
+    *ptr = '\0';
+    return buf;
 }
 
 int main()
@@ -76,17 +111,20 @@ int main()
     Delay_Init();
     USART_Printf_Init(115200);
 
+    char buf[12+1] = "";
+    graph_bar(33, 0, 100, 'x', '.', buf, 12);
+    printf("%d%% %s\n", 33, buf);
+
     re_init(&enc0);
 
     pool_init(menu_pool, MENU_POOL_MAX, item_pool, ITEM_POOL_MAX);
-    struct Menu *root = menu_init(NULL);
-    struct ViewPort vp = vp_init(10, 7);
+    root = menu_init(NULL);
+    vp = vp_init(10, 7);
     setup_menu(root);
     menu_debug(root);
 
     i2c_init(I2C1, GPIO_Pin_6, GPIO_Pin_7, I2C_GPIO_PORT); // SCL, SDA
 
-    struct Oled oled;
     if (oled_init(&oled, I2C1, OLED_ADDR) < OLED_STATUS_SUCCESS)
         printf("Failed to init display\n");
 
