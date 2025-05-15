@@ -10,6 +10,8 @@
 #include "i2c.h"
 #include "rotenc.h"
 #include "menu.h"
+#include "dfu.h"
+#include "millis.h"
 
 struct RotEnc enc0;
 struct Oled oled;
@@ -104,12 +106,45 @@ char* graph_bar(float value, float low, float high, char lchar, char rchar, char
     return buf;
 }
 
+void check_boot()
+{
+    GPIO_InitTypeDef ROT_SW_InitStructure = {0};
+
+    // RCC->APB2PCENR - set Alternative Functions IO Clock, GPIO port clock
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+
+    GPIO_StructInit(&ROT_SW_InitStructure);
+    ROT_SW_InitStructure.GPIO_Pin = ROT_SW_PIN;
+    ROT_SW_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_Init(ROT_SW_PORT, &ROT_SW_InitStructure);
+
+    printf("Checking DFU\n");
+
+    u32 t_start = millis();
+
+    while (!GPIO_ReadInputDataBit(ROT_SW_PORT, ROT_SW_PIN)) {
+        if (millis() - t_start > 1000) {
+            printf("Triggered DFU boot\n");
+
+            while (!GPIO_ReadInputDataBit(ROT_SW_PORT, ROT_SW_PIN))
+                asm("nop");
+            printf("Released\n");
+            Delay_Ms(500);
+
+        }
+    }
+}
+
 int main()
 {
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
     SystemCoreClockUpdate();
+
     Delay_Init();
     USART_Printf_Init(115200);
+
+    millis_init();
+    check_boot();
 
     char buf[12+1] = "";
     graph_bar(33, 0, 100, 'x', '.', buf, 12);
@@ -137,20 +172,19 @@ int main()
 
     oled_flush(&oled);
 
-    struct Menu *rootptr = root;
-    struct Menu **menu = &rootptr;
+    struct Menu *menu = root;
 
     while(1) {
         if (enc0.is_triggered) {
             enc0.is_triggered = 0;
             switch (enc0.dir) {
                 case R_DIR_CW:
-                    vp_next(&vp, *menu);
-                    vp_debug(&vp, *menu);
+                    vp_next(&vp, menu);
+                    vp_debug(&vp, menu);
                     break;
                 case R_DIR_CCW:
-                    vp_prev(&vp, *menu);
-                    vp_debug(&vp, *menu);
+                    vp_prev(&vp, menu);
+                    vp_debug(&vp, menu);
                     break;
             }
             printf("enc0: %d\n", enc0.n_clicks);
@@ -160,8 +194,8 @@ int main()
             printf("clicked\n");
 
             struct Menu *sel;
-            if ((sel = vp_handle_clicked(&vp, *menu)) != NULL) {
-                *menu = sel;
+            if ((sel = vp_handle_clicked(&vp, menu)) != NULL) {
+                menu = sel;
                 //vp_reset(&vp);
             }
             else {
@@ -170,7 +204,7 @@ int main()
         }
 
         oled_clear(&oled);
-        oled_print_menu(&oled, &vp, *menu);
+        oled_print_menu(&oled, &vp, menu);
         oled_flush(&oled);
 
         Delay_Ms(10);
