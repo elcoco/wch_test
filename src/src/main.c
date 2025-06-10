@@ -46,10 +46,10 @@ void setup_menu(struct Menu *root)
     menu_add_item(sub0, "sub0_item1", &on_item_clicked_cb);
     menu_add_item(sub0, "sub0_item2", &on_item_clicked_cb);
 
-    menu_add_submenu(root, sub0, "bever sub");
     menu_add_item(root, "item0", &on_item_clicked_cb);
     menu_add_item(root, "item1", &on_item_clicked_cb);
     menu_add_item(root, "item2_abcdefghijklmnopqrstuvwxyz", &on_item_clicked_cb);
+    menu_add_submenu(root, sub0, "bever sub");
     menu_add_item(root, "item3", &on_item_clicked_cb);
     menu_add_item(root, "item4", &on_item_clicked_cb);
     menu_add_item(root, "item5", &on_item_clicked_cb);
@@ -173,21 +173,26 @@ int main()
     oled_flush(&oled);
 
     struct Menu *menu = root;
+    u8 prev_clicks = 0;
 
     while(1) {
         if (enc0.is_triggered) {
             enc0.is_triggered = 0;
             switch (enc0.dir) {
                 case R_DIR_CW:
-                    vp_next(&vp, menu);
+                    for (int i=0 ; i<prev_clicks-enc0.n_clicks ; i++)
+                        vp_next(&vp, menu);
+
                     vp_debug(&vp, menu);
                     break;
                 case R_DIR_CCW:
-                    vp_prev(&vp, menu);
+                    for (int i=0 ; i<enc0.n_clicks-prev_clicks ; i++)
+                        vp_prev(&vp, menu);
                     vp_debug(&vp, menu);
                     break;
             }
             printf("enc0: %d\n", enc0.n_clicks);
+            prev_clicks = enc0.n_clicks;
         }
         if (enc0.is_pressed) {
             enc0.is_pressed = 0;

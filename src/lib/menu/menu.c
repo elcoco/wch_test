@@ -66,7 +66,7 @@ static void vp_reset(struct ViewPort *vp, uint8_t new_pos)
 {
     vp->pos = new_pos;
     vp->line_start = new_pos;
-    vp->line_end = new_pos + vp->max_lines;
+    vp->line_end = new_pos + vp->max_lines -1;
 }
 
 static void menu_debug_rec(struct Menu *menu, uint8_t level)
@@ -235,11 +235,12 @@ struct Menu* vp_handle_clicked(struct ViewPort *vp, struct Menu *menu)
     // Clicked on "go back" item, go up one level
     if (strncmp(selected->title, MENU_BACK_STR, MENU_MAX_TITLE) == 0) {
         vp_reset(vp, selected->parent->prev_pos); // Restore position
-        menu->prev_pos = -1;
+        //menu->prev_pos = -1;
         return selected->parent;
     }
     // Clicked on submenu, go into submenu
     else if (selected->sub_menu) {
+        printf("prev pos: %d\n", menu->prev_pos);
         menu->prev_pos = vp->pos;                 // Backup position
         vp_reset(vp, 0);
         return selected->sub_menu;
